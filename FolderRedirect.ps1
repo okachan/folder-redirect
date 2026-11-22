@@ -1,4 +1,4 @@
-# FolderRedirect.ps1 - v1.0
+# FolderRedirect.ps1 - v1.0.1
 # !!! USE AT YOUR OWN RISK / 利用は自己責任 !!!
 # このツールはフォルダを移動し、元フォルダを削除してジャンクションに置き換えます。
 # 使い方を誤るとアプリが動かなくなったり、最悪データが失われる可能性があります。
@@ -42,11 +42,17 @@ function Do-Redirect($src, $root, $dst) {
     if (-not $src) { return "対象が空です" }
     $src = $src.TrimEnd('\')
     if ($src -match '^[A-Za-z]:$') { return "ドライブ直下は対象にできません" }
-    # 安全ガード：システム系・プロファイル直下は拒否
-    $blocked = @($env:windir, "C:\Program Files", "C:\Program Files (x86)", "C:\ProgramData\Microsoft", $env:USERPROFILE, "C:\Users", "C:\Recovery", "C:\System Volume Information")
-    foreach ($b in $blocked) {
+    # 安全ガード：システム系は配下ごと拒否、プロファイル直下などは完全一致のみ拒否
+    $blockedPrefix = @($env:windir, "C:\Program Files", "C:\Program Files (x86)", "C:\ProgramData\Microsoft", "C:\Recovery", "C:\System Volume Information")
+    $blockedExact  = @($env:USERPROFILE, "C:\Users")
+    foreach ($b in $blockedPrefix) {
         if ($b -and ($src -ieq $b -or $src.StartsWith($b.TrimEnd('\') + '\', [System.StringComparison]::OrdinalIgnoreCase))) {
             return "中止（安全ガード）: システム系フォルダは対象にできません: $src"
+        }
+    }
+    foreach ($b in $blockedExact) {
+        if ($b -and ($src -ieq $b)) {
+            return "中止（安全ガード）: このフォルダ自体は対象にできません: $src"
         }
     }
     if (Is-Junction $src) { return "済み（既にジャンクション）: $src" }
